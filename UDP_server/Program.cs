@@ -41,13 +41,19 @@ namespace UDP_server
                         Console.WriteLine("Waiting ...");
                         //listen on 11000
                         byte[] bytes = listener.Receive(ref groupEP);
+                        //answer for it fast as possible
+                        if (Encoding.ASCII.GetString(bytes) == "ping")
+                        {
+                            sender.Send(bytes, bytes.Length, groupEP.Address.ToString(), Client_listenPort);
+                        }
                         //already exist in collection 
-                        if(groupEP != null && !AllClients.Any((ip)=> ip.Address.ToString() == groupEP.Address.ToString()))
+                        if (groupEP != null && !AllClients.Any((ip)=> ip.Address.ToString() == groupEP.Address.ToString()))
                         {
                             AllClients.TryAdd(groupEP);
                         }
+                        
                         Console.WriteLine($"Received from {groupEP} :");
-                        Console.WriteLine($" {Encoding.ASCII.GetString(bytes, 0, bytes.Length)}");
+                        Console.WriteLine($" {Encoding.ASCII.GetString(bytes)}");
                         groupEP = null;
                     }
                 }
