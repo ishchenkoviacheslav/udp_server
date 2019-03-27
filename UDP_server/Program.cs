@@ -7,18 +7,28 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Linq;
+using Microsoft.Extensions.Configuration;
+using System.IO;
 
 namespace UDP_server
 {
 
     public class UDPListener
     {
-        private const int listenPort = 11000;
+        private static IConfigurationRoot configuration;
+        private static int Client_listenPort = 0;
+        private static int Server_listenPort = 0;
         private static BlockingCollection<IPEndPoint> AllClients = new BlockingCollection<IPEndPoint>();
         private static void StartListener()
         {
+            Client_listenPort = int.Parse(configuration["client_listenPort"]);
+            Server_listenPort = int.Parse(configuration["server_listenPort"]);
+            //Server_listenPort = int.Parse(configuration.GetSection("server_listenPort").Value);
+            if (Client_listenPort == 0 || Server_listenPort == 0)
+                throw new Exception("configuration data is wrong");
+
             Console.WriteLine("*********Server*******");
-            UdpClient listener = new UdpClient(listenPort);
+            UdpClient listener = new UdpClient(Server_listenPort);
             UdpClient sender = new UdpClient();
             IPEndPoint groupEP = null;// new IPEndPoint(IPAddress.Any, listenPort);
             byte[] myString = Encoding.ASCII.GetBytes("Data from server!");
@@ -59,7 +69,8 @@ namespace UDP_server
                     Thread.Sleep(10000);
                     foreach (IPEndPoint iPEndPoint in AllClients)
                     {
-                        sender.Send(myString, myString.Length, iPEndPoint.Address.ToString(),11001);
+                        //this answer will come to client not from 11000 port...
+                        sender.Send(myString, myString.Length, iPEndPoint.Address.ToString(), Client_listenPort);
                     }
                 }
             });
@@ -68,6 +79,12 @@ namespace UDP_server
 
         public static void Main()
         {
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json");
+
+            configuration = builder.Build();
+
             StartListener();
         }
     }
