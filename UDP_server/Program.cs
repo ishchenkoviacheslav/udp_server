@@ -19,8 +19,13 @@ namespace UDP_server
         private static int Client_listenPort = 0;
         private static int Server_listenPort = 0;
         private static BlockingCollection<IPEndPoint> AllClients = new BlockingCollection<IPEndPoint>();
+        private static byte[] ping = Encoding.ASCII.GetBytes("ping");
+
         private static void StartListener()
         {
+            //for ping it work slow!
+            Console.WriteLine("Waiting ...");
+
             Client_listenPort = int.Parse(configuration["client_listenPort"]);
             Server_listenPort = int.Parse(configuration["server_listenPort"]);
             //Server_listenPort = int.Parse(configuration.GetSection("server_listenPort").Value);
@@ -38,22 +43,26 @@ namespace UDP_server
                 {
                     while (true)
                     {
-                        Console.WriteLine("Waiting ...");
                         //listen on 11000
                         byte[] bytes = listener.Receive(ref groupEP);
                         //answer for it fast as possible
-                        if (Encoding.ASCII.GetString(bytes) == "ping")
+                        if (bytes.SequenceEqual(ping))
                         {
                             sender.Send(bytes, bytes.Length, groupEP.Address.ToString(), Client_listenPort);
+                        }
+                        else
+                        {
+                            // not good - add to list only after. But cw is slow command. It must to work only if current request is NOT ping.
+                            //first request will response fast but if cw will work than second request will wait to finish of cw.
+                            Console.WriteLine($"Received from {groupEP} :");
+                            Console.WriteLine($" {Encoding.ASCII.GetString(bytes)}");
                         }
                         //already exist in collection 
                         if (groupEP != null && !AllClients.Any((ip)=> ip.Address.ToString() == groupEP.Address.ToString()))
                         {
                             AllClients.TryAdd(groupEP);
                         }
-                        
-                        Console.WriteLine($"Received from {groupEP} :");
-                        Console.WriteLine($" {Encoding.ASCII.GetString(bytes)}");
+                        //not critical make null. ref modificator will change this reference
                         groupEP = null;
                     }
                 }
