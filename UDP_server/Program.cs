@@ -20,6 +20,7 @@ namespace UDP_server
         private static int Server_listenPort = 0;
         private static BlockingCollection<IPEndPoint> AllClients = new BlockingCollection<IPEndPoint>();
         private static byte[] ping = Encoding.ASCII.GetBytes("ping");
+        private static int pauseBetweenSendData = 0;
 
         private static void StartListener()
         {
@@ -29,7 +30,9 @@ namespace UDP_server
             Client_listenPort = int.Parse(configuration["client_listenPort"]);
             Server_listenPort = int.Parse(configuration["server_listenPort"]);
             //Server_listenPort = int.Parse(configuration.GetSection("server_listenPort").Value);
-            if (Client_listenPort == 0 || Server_listenPort == 0)
+            pauseBetweenSendData = int.Parse(configuration["pauseBetweenSendData"]);
+
+            if (Client_listenPort == 0 || Server_listenPort == 0 || pauseBetweenSendData < 10)
                 throw new Exception("configuration data is wrong");
 
             Console.WriteLine("*********Server*******");
@@ -37,6 +40,7 @@ namespace UDP_server
             UdpClient sender = new UdpClient();
             IPEndPoint groupEP = null;// new IPEndPoint(IPAddress.Any, listenPort);
             byte[] myString = Encoding.ASCII.GetBytes("Data from server!");
+            //listen 
             Task.Run(() =>
             {
                 try
@@ -50,13 +54,13 @@ namespace UDP_server
                         {
                             sender.Send(bytes, bytes.Length, groupEP.Address.ToString(), Client_listenPort);
                         }
-                        else
-                        {
-                            // not good - add to list only after. But cw is slow command. It must to work only if current request is NOT ping.
-                            //first request will response fast but if cw will work than second request will wait to finish of cw.
-                            Console.WriteLine($"Received from {groupEP} :");
-                            Console.WriteLine($" {Encoding.ASCII.GetString(bytes)}");
-                        }
+                        ////else
+                        ////{
+                        ////    // not good - add to list only after. But cw is slow command. It must to work only if current request is NOT ping.
+                        ////    //first request will response fast but if cw will work than second request will wait to finish of cw.
+                        ////    Console.WriteLine($"Received from {groupEP} :");
+                        ////    Console.WriteLine($" {Encoding.ASCII.GetString(bytes)}");
+                        ////}
                         //already exist in collection 
                         if (groupEP != null && !AllClients.Any((ip)=> ip.Address.ToString() == groupEP.Address.ToString()))
                         {
@@ -81,7 +85,7 @@ namespace UDP_server
                 {
                     //ukrtelecom 92.112.59.89 - must be
                     //umc 46.133.172.211
-                    Thread.Sleep(10000);
+                    //Thread.Sleep(pauseBetweenSendData);
                     foreach (IPEndPoint iPEndPoint in AllClients)
                     {
                         //this answer will come to client not from 11000 port...
