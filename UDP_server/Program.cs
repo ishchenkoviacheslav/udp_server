@@ -16,7 +16,7 @@ namespace UDP_server
     public class UDPListener
     {
         private static IConfigurationRoot configuration;
-        private static int Client_listenPort = 0;
+        //private static int Client_listenPort = 0;
         private static int Server_listenPort = 0;
         private static BlockingCollection<IPEndPoint> AllClients = new BlockingCollection<IPEndPoint>();
         private static byte[] ping = Encoding.ASCII.GetBytes("ping");
@@ -27,32 +27,33 @@ namespace UDP_server
             //for ping it work slow!
             Console.WriteLine("Waiting ...");
 
-            Client_listenPort = int.Parse(configuration["client_listenPort"]);
+            //Client_listenPort = int.Parse(configuration["client_listenPort"]);
             Server_listenPort = int.Parse(configuration["server_listenPort"]);
             //Server_listenPort = int.Parse(configuration.GetSection("server_listenPort").Value);
             pauseBetweenSendData = int.Parse(configuration["pauseBetweenSendData"]);
 
-            if (Client_listenPort == 0 || Server_listenPort == 0 || pauseBetweenSendData < 10)
+            if (/*Client_listenPort == 0 ||*/ Server_listenPort == 0 || pauseBetweenSendData < 10)
                 throw new Exception("configuration data is wrong");
 
             Console.WriteLine("*********Server*******");
             UdpClient listener = new UdpClient(Server_listenPort);
-            UdpClient sender = new UdpClient();
+            //UdpClient sender = new UdpClient();
             IPEndPoint groupEP = null;// new IPEndPoint(IPAddress.Any, listenPort);
             byte[] myString = Encoding.ASCII.GetBytes("Data from server!");
             //listen 
-            Task.Run(() =>
+            Task.Run(async () =>
             {
                 try
                 {
                     while (true)
                     {
-                        //listen on 11000
-                        byte[] bytes = listener.Receive(ref groupEP);
+                        UdpReceiveResult result = await listener.ReceiveAsync();
+                        byte[] bytes = result.Buffer;
+                        groupEP = result.RemoteEndPoint;
                         //answer for it fast as possible
                         if (bytes.SequenceEqual(ping))
                         {
-                            sender.Send(bytes, bytes.Length, groupEP.Address.ToString(), Client_listenPort);
+                            listener.Send(bytes, bytes.Length, groupEP);
                         }
                         ////else
                         ////{
@@ -64,6 +65,7 @@ namespace UDP_server
                         //already exist in collection 
                         if (groupEP != null && !AllClients.Any((ip)=> ip.Address.ToString() == groupEP.Address.ToString()))
                         {
+                            Console.WriteLine($"added {groupEP}");
                             AllClients.TryAdd(groupEP);
                         }
                         //not critical make null. ref modificator will change this reference
@@ -85,11 +87,12 @@ namespace UDP_server
                 {
                     //ukrtelecom 92.112.59.89 - must be
                     //umc 46.133.172.211
-                    //Thread.Sleep(pauseBetweenSendData);
+                    Thread.Sleep(pauseBetweenSendData);
                     foreach (IPEndPoint iPEndPoint in AllClients)
                     {
+                        //Console.WriteLine(iPEndPoint.Address.ToString() + ":" + iPEndPoint.Port);//123.456.789.101:12345
                         //this answer will come to client not from 11000 port...
-                        sender.Send(myString, myString.Length, iPEndPoint.Address.ToString(), Client_listenPort);
+                        listener.Send(myString, myString.Length, iPEndPoint);
                     }
                 }
             });
@@ -105,6 +108,36 @@ namespace UDP_server
             configuration = builder.Build();
 
             StartListener();
+
+            ////int port = 27005;
+            ////UdpClient udpListener = new UdpClient(port);
+            ////IPEndPoint ipEndPoint = new IPEndPoint(IPAddress.Any, port);
+
+            ////byte[] receivedBytes = udpListener.Receive(ref ipEndPoint);      // Receive the information from the client as byte array
+            ////string clientMessage = Encoding.UTF8.GetString(receivedBytes);   // Convert the message to a string
+
+            ////byte[] response = Encoding.UTF8.GetBytes("Hello client, this is the server");   // Convert the reponse we want to send to the client to byte array
+            ////udpListener.Send(response, response.Length, ipEndPoint);
+
+            ////work good
+            //Task.Run(async()=> 
+            //{
+            //    Console.WriteLine("Server");
+
+            //    int port = 27005;
+            //    UdpClient udpListener = new UdpClient(port);
+            //    IPEndPoint ipEndPoint = new IPEndPoint(IPAddress.Any, port);
+
+            //    UdpReceiveResult result = await udpListener.ReceiveAsync();      // Receive the information from the client as byte array
+            //    ipEndPoint = result.RemoteEndPoint;
+            //    byte[] receivedBytes = result.Buffer;
+            //    string clientMessage = Encoding.UTF8.GetString(receivedBytes);   // Convert the message to a string
+
+            //    byte[] response = Encoding.UTF8.GetBytes("Hello client, this is the server");   // Convert the reponse we want to send to the client to byte array
+            //    await udpListener.SendAsync(response, response.Length, ipEndPoint);
+
+            //});
+            //Console.ReadLine();
         }
     }
    
