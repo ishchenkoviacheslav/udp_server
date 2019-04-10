@@ -21,6 +21,7 @@ namespace UDP_server
         private static BlockingCollection<IPEndPoint> AllClients = new BlockingCollection<IPEndPoint>();
         private static byte[] ping = Encoding.ASCII.GetBytes("ping");
         private static int pauseBetweenSendData = 0;
+        public const int SIO_UDP_CONNRESET = -1744830452;
 
         private static void StartListener()
         {
@@ -37,6 +38,8 @@ namespace UDP_server
 
             Console.WriteLine("*********Server*******");
             UdpClient listener = new UdpClient(Server_listenPort);
+            //fix problem with disconnect or crash one of clients
+            listener.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET,new byte[] { 0, 0, 0, 0 }, null);
             //UdpClient sender = new UdpClient();
             IPEndPoint groupEP = null;// new IPEndPoint(IPAddress.Any, listenPort);
             byte[] myString = Encoding.ASCII.GetBytes("Data from server!");
@@ -47,13 +50,21 @@ namespace UDP_server
                 {
                     while (true)
                     {
-                        UdpReceiveResult result = await listener.ReceiveAsync();
+                        UdpReceiveResult result;
+                        try
+                        {
+                            result = await listener.ReceiveAsync();
+                        }
+                        catch (SocketException socketEx)
+                        {
+                            Console.WriteLine(socketEx.Message);
+                        }
                         byte[] bytes = result.Buffer;
                         groupEP = result.RemoteEndPoint;
                         //answer for it fast as possible
                         if (bytes.SequenceEqual(ping))
                         {
-                            listener.Send(bytes, bytes.Length, groupEP);
+                            await listener.SendAsync(bytes, bytes.Length, groupEP);
                         }
                         ////else
                         ////{
@@ -81,7 +92,7 @@ namespace UDP_server
                     listener.Close();
                 }
             });
-            Task.Run(() =>
+            Task.Run(async () =>
             {
                 while (true)
                 {
@@ -92,7 +103,7 @@ namespace UDP_server
                     {
                         //Console.WriteLine(iPEndPoint.Address.ToString() + ":" + iPEndPoint.Port);//123.456.789.101:12345
                         //this answer will come to client not from 11000 port...
-                        listener.Send(myString, myString.Length, iPEndPoint);
+                        await listener.SendAsync(myString, myString.Length, iPEndPoint);
                     }
                 }
             });
