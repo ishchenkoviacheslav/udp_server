@@ -14,5 +14,6 @@ namespace UDP_server
         }
         public IPEndPoint EndPoint { get; set; }
         public DateTime LastPing { get; set; }
+        public int DataNumber { get; set; }
     }
 }

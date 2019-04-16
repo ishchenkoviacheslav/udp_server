@@ -9,10 +9,13 @@ using System.Collections.Concurrent;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using System.IO;
+using NLog;
 
 namespace UDP_server
 {
-
+    //by productions: 
+    //delete all cw(logger instead of this)
+    //
     public class UDPListener
     {
         private static IConfigurationRoot configuration;
@@ -25,11 +28,13 @@ namespace UDP_server
         private static int waitBeforeDisconnect = 0;
         private static int refreshListOfClients = 0;
         private static object locker = new object();
+        private static Logger logger = LogManager.GetCurrentClassLogger();
 
         private static void StartListener()
         {
             //for ping it work slow!
             Console.WriteLine("Waiting ...");
+            logger.Info("Waiting...");
 
             //Client_listenPort = int.Parse(configuration["client_listenPort"]);
             Server_listenPort = int.Parse(configuration["server_listenPort"]);
@@ -85,8 +90,9 @@ namespace UDP_server
                         {
                             if (groupEP != null && !AllClients.Any((client) => client.EndPoint.Address.ToString() == groupEP.Address.ToString()))
                             {
+                                //log Count of clients? Like a critical load
                                 Console.WriteLine($"added {groupEP}");
-
+                                logger.Info($"added {groupEP}");
                                 AllClients.Add(new Client(groupEP, DateTime.UtcNow));
                             }
                         }
@@ -97,6 +103,7 @@ namespace UDP_server
                 catch (SocketException e)
                 {
                     Console.WriteLine(e?.Message);
+                    logger.Fatal(e, $"UdpClient object is closing...{e.Message}");
                 }
                 finally
                 {
@@ -106,22 +113,29 @@ namespace UDP_server
             //send data to all clients
             Task.Run(async () =>
             {
-                while (true)
+                try
                 {
-                    Thread.Sleep(pauseBetweenSendData);
-                    //await can't be in lock - is reason why the Collection without lock
-                    //but i think it's non-critical in current situation, because here only send data for all clients(1.only read 2.not big problem if someone take data a few millisecond later)
-                    //lock(locker)
-                    //{
-                    foreach (Client currClient in AllClients)
+                    while (true)
                     {
-                        //Console.WriteLine(iPEndPoint.Address.ToString() + ":" + iPEndPoint.Port);//123.456.789.101:12345
-                        //this answer will come to client not from 11000 port...
-                        await listener.SendAsync(myString, myString.Length, currClient.EndPoint);
+                        Thread.Sleep(pauseBetweenSendData);
+                        //await can't be in lock - is reason why the Collection without lock
+                        //but i think it's non-critical in current situation, because here only send data for all clients(1.only read 2.not big problem if someone take data a few millisecond later)
+                        //lock(locker)
+                        //{
+                        foreach (Client currClient in AllClients)
+                        {
+                            //Console.WriteLine(iPEndPoint.Address.ToString() + ":" + iPEndPoint.Port);//123.456.789.101:12345
+                            //this answer will come to client not from 11000 port...
+                            await listener.SendAsync(myString, myString.Length, currClient.EndPoint);
+                        }
+                        //}
                     }
-                    //}
-
                 }
+                catch (Exception ex)
+                {
+                    logger.Fatal(ex, $"send data mechanism has exception: {ex.Message}");
+                }
+
             });
             //remove all disconnected clients
             Task.Run(() =>
@@ -150,6 +164,7 @@ namespace UDP_server
                 catch (Exception ex)
                 {
                     Console.WriteLine(ex.Message);
+                    logger.Fatal(ex, $"mechanishm of remove disconnected clients has exception: {ex.Message}");
                 }
             });
             Console.ReadLine();
