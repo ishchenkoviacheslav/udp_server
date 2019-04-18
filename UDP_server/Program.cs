@@ -46,7 +46,10 @@ namespace UDP_server
             refreshListOfClients = int.Parse(configuration[nameof(refreshListOfClients)]);
             IntervalForLogging = double.Parse(configuration[nameof(IntervalForLogging)]);
             if (/*Client_listenPort == 0 ||*/ server_listenPort == 0 || pauseBetweenSendData < 10 || waitBeforeDisconnect == 0 || refreshListOfClients == 0 || IntervalForLogging < 30000)
-                throw new Exception("configuration data is wrong");
+            {
+                logger.Fatal("configuration data is wrong");
+                return;
+            }
 
             Console.WriteLine("*********Server*******");
             UdpClient listener = new UdpClient(server_listenPort);
