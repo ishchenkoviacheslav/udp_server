@@ -20,7 +20,7 @@ namespace UDP_server
     {
         private static IConfigurationRoot configuration;
         //private static int Client_listenPort = 0;
-        private static int Server_listenPort = 0;
+        private static int server_listenPort = 0;
         private static List<Client> AllClients = new List<Client>();
         private static byte[] ping = Encoding.ASCII.GetBytes("ping");
         private static int pauseBetweenSendData = 0;
@@ -29,6 +29,8 @@ namespace UDP_server
         private static int refreshListOfClients = 0;
         private static object locker = new object();
         private static Logger logger = LogManager.GetCurrentClassLogger();
+        private static TimeSpan minimumPause = new TimeSpan(0,0,0,0,10);
+        public static double IntervalForLogging = 0;
 
         private static void StartListener()
         {
@@ -37,16 +39,17 @@ namespace UDP_server
             logger.Info("Waiting...");
 
             //Client_listenPort = int.Parse(configuration["client_listenPort"]);
-            Server_listenPort = int.Parse(configuration["server_listenPort"]);
+            server_listenPort = int.Parse(configuration[nameof(server_listenPort)]);
             //Server_listenPort = int.Parse(configuration.GetSection("server_listenPort").Value);
-            pauseBetweenSendData = int.Parse(configuration["pauseBetweenSendData"]);
-            waitBeforeDisconnect = int.Parse(configuration["waitBeforeDisconnect"]);
-            refreshListOfClients = int.Parse(configuration["refreshListOfClients"]);
-            if (/*Client_listenPort == 0 ||*/ Server_listenPort == 0 || pauseBetweenSendData < 10 || waitBeforeDisconnect == 0 || refreshListOfClients == 0)
+            pauseBetweenSendData = int.Parse(configuration[nameof(pauseBetweenSendData)]);
+            waitBeforeDisconnect = int.Parse(configuration[nameof(waitBeforeDisconnect)]);
+            refreshListOfClients = int.Parse(configuration[nameof(refreshListOfClients)]);
+            IntervalForLogging = double.Parse(configuration[nameof(IntervalForLogging)]);
+            if (/*Client_listenPort == 0 ||*/ server_listenPort == 0 || pauseBetweenSendData < 10 || waitBeforeDisconnect == 0 || refreshListOfClients == 0 || IntervalForLogging < 30000)
                 throw new Exception("configuration data is wrong");
 
             Console.WriteLine("*********Server*******");
-            UdpClient listener = new UdpClient(Server_listenPort);
+            UdpClient listener = new UdpClient(server_listenPort);
             //fix problem with disconnect or crash one of clients
             listener.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
             //UdpClient sender = new UdpClient();
@@ -77,23 +80,24 @@ namespace UDP_server
                                     currClient.LastPing = DateTime.UtcNow;
                                 }
                             }
+                            continue;
                         }
-                        ////else
-                        ////{
-                        ////    // not good - add to list only after. But cw is slow command. It must to work only if current request is NOT ping.
-                        ////    //first request will response fast but if cw will work than second request will wait to finish of cw.
-                        ////    Console.WriteLine($"Received from {groupEP} :");
-                        ////    Console.WriteLine($" {Encoding.ASCII.GetString(bytes)}");
-                        ////}
+                        
                         //already exist in collection 
                         lock (locker)
                         {
                             if (groupEP != null && !AllClients.Any((client) => client.EndPoint.Address.ToString() == groupEP.Address.ToString()))
                             {
                                 //log Count of clients? Like a critical load
+                                //make be some time...not every time
                                 Console.WriteLine($"added {groupEP}");
                                 logger.Info($"added {groupEP}");
                                 AllClients.Add(new Client(groupEP, DateTime.UtcNow));
+                                //when add new user's data, make it data as byte[]
+                            }
+                            else
+                            {
+
                             }
                         }
                         //not critical make null. ref modificator will change this reference
@@ -111,31 +115,50 @@ namespace UDP_server
                 }
             });
             //send data to all clients
-            Task.Run(async () =>
+            Task.Run(() =>
             {
                 try
                 {
+                    DateTime temp;
+                    //timer only for logging
+                    System.Timers.Timer intervalForWriteLog = new System.Timers.Timer() { Interval = IntervalForLogging, Enabled = true, AutoReset = false };
+                    intervalForWriteLog.Elapsed += (object sender, System.Timers.ElapsedEventArgs e) => { ((System.Timers.Timer)sender).Enabled = false; };
                     while (true)
                     {
-                        Thread.Sleep(pauseBetweenSendData);
                         //await can't be in lock - is reason why the Collection without lock
                         //but i think it's non-critical in current situation, because here only send data for all clients(1.only read 2.not big problem if someone take data a few millisecond later)
-                        //lock(locker)
-                        //{
-                        foreach (Client currClient in AllClients)
+                        temp = DateTime.UtcNow;
+                        lock (locker)
                         {
-                            //Console.WriteLine(iPEndPoint.Address.ToString() + ":" + iPEndPoint.Port);//123.456.789.101:12345
-                            //this answer will come to client not from 11000 port...
-                            await listener.SendAsync(myString, myString.Length, currClient.EndPoint);
+                            for (int z = 0; z < AllClients.Count; z++)
+                            {
+                                //this answer will come to client not from 11000 port...(from who and to whom)
+                                listener.Send(myString, myString.Length, AllClients[z].EndPoint);
+                            }
                         }
-                        //}
+                        TimeSpan total = DateTime.UtcNow.Subtract(temp);
+                        //timer only for logging
+                        if (!intervalForWriteLog.Enabled)
+                        {
+                            int CountOfClient;
+                            lock(locker)
+                            {
+                                CountOfClient = AllClients.Count;
+                            }
+                            logger.Info($"Time execution for clients list {total}, Count of clients: {CountOfClient}");
+                            intervalForWriteLog.Enabled = true;
+                        }
+                        //make a pause if time will so short (less than 10 ms). Or if pauseBetweenSendData will 40 ms / 2 = 20, than 19 ms will make a pause also
+                        if (total < new TimeSpan(0, 0, 0, 0, (pauseBetweenSendData/2)) || total < minimumPause)
+                        {
+                            Thread.Sleep(pauseBetweenSendData);
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     logger.Fatal(ex, $"send data mechanism has exception: {ex.Message}");
                 }
-
             });
             //remove all disconnected clients
             Task.Run(() =>
@@ -145,20 +168,21 @@ namespace UDP_server
                     while (true)
                     {
                         Thread.Sleep((refreshListOfClients * 1000));
-                        Console.WriteLine($"Start of copy: {DateTime.UtcNow}, count of clients: {AllClients.Count}");
                         List<Client> listForRemove = new List<Client>();
+                        DateTime temp = DateTime.UtcNow;
                         lock (locker)
                         {
-                            foreach (Client client in AllClients)
+                            for (int rl = 0; rl < AllClients.Count; rl++)
                             {
-                                if (DateTime.UtcNow.Subtract(client.LastPing) > compareTimeForRemove)
+                                if (DateTime.UtcNow.Subtract(AllClients[rl].LastPing) > compareTimeForRemove)
                                 {
-                                    listForRemove.Add(client);
+                                    listForRemove.Add(AllClients[rl]);
                                 }
                             }
                             AllClients = AllClients.Except(listForRemove).ToList();
                         }
-                        Console.WriteLine($"End of copy: {DateTime.UtcNow}, count of clients: {AllClients.Count}");
+                        TimeSpan result = DateTime.UtcNow.Subtract(temp);
+                        Console.WriteLine(result);
                     }
                 }
                 catch (Exception ex)
