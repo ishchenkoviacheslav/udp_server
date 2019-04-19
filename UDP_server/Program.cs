@@ -59,7 +59,7 @@ namespace UDP_server
             IPEndPoint groupEP = null;// new IPEndPoint(IPAddress.Any, listenPort);
             //sekonds
             TimeSpan compareTimeForRemove = new TimeSpan(0, 0, waitBeforeDisconnect);
-            byte[] myString = Encoding.ASCII.GetBytes("Data from server!");
+            
             //listen 
             Task.Run(async () =>
             {
@@ -136,7 +136,8 @@ namespace UDP_server
                             for (int z = 0; z < AllClients.Count; z++)
                             {
                                 //this answer will come to client not from 11000 port...(from who and to whom)
-                                listener.Send(myString, myString.Length, AllClients[z].EndPoint);
+                                //new List vs List.Clear()?
+                                listener.Send(null,0 , AllClients[z].EndPoint);
                             }
                         }
                         TimeSpan total = DateTime.UtcNow.Subtract(temp);
