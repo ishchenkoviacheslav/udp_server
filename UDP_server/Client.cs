@@ -5,6 +5,7 @@ using System.Text;
 
 namespace UDP_server
 {
+    [Serializable]
     public class Client
     {
         public Client(IPEndPoint endPoint, DateTime dateTime)
@@ -14,7 +15,7 @@ namespace UDP_server
         }
         public IPEndPoint EndPoint { get; set; }
         public DateTime LastPing { get; set; }
-        public int NumberOfPacket { get; set; }
-        public ClientData Data { get; set; }
+        public uint NumberOfPacket { get; set; }
+        public ClientData Data { get; set; } = new ClientData() { X = 0, Y = 0, Z = 0 };
     }
 }

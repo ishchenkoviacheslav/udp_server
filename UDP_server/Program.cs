@@ -31,12 +31,11 @@ namespace UDP_server
         private static Logger logger = LogManager.GetCurrentClassLogger();
         private static TimeSpan minimumPause = new TimeSpan(0,0,0,0,10);
         public static double IntervalForLogging = 0;
+        private static bool IsDebug = false;
 
         private static void StartListener()
         {
-            //for ping it work slow!
-            Console.WriteLine("Waiting ...");
-            logger.Info("Waiting...");
+            
 
             //Client_listenPort = int.Parse(configuration["client_listenPort"]);
             server_listenPort = int.Parse(configuration[nameof(server_listenPort)]);
@@ -45,18 +44,25 @@ namespace UDP_server
             waitBeforeDisconnect = int.Parse(configuration[nameof(waitBeforeDisconnect)]);
             refreshListOfClients = int.Parse(configuration[nameof(refreshListOfClients)]);
             IntervalForLogging = double.Parse(configuration[nameof(IntervalForLogging)]);
+            IsDebug = bool.Parse(configuration[nameof(IsDebug)]);
             if (/*Client_listenPort == 0 ||*/ server_listenPort == 0 || pauseBetweenSendData < 10 || waitBeforeDisconnect == 0 || refreshListOfClients == 0 || IntervalForLogging < 30000)
             {
                 logger.Fatal("configuration data is wrong");
+                if (IsDebug)
+                {
+                    Console.WriteLine("configuration data is wrong");
+                }
                 return;
             }
-
-            Console.WriteLine("*********Server*******");
+            if(IsDebug)
+            {
+                Console.WriteLine("Waiting ...");
+                logger.Info("Waiting...");
+                Console.WriteLine("*********Server*******");
+            }
             UdpClient listener = new UdpClient(server_listenPort);
             //fix problem with disconnect or crash one of clients
             listener.Client.IOControl((IOControlCode)SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
-            //UdpClient sender = new UdpClient();
-            IPEndPoint groupEP = null;// new IPEndPoint(IPAddress.Any, listenPort);
             //sekonds
             TimeSpan compareTimeForRemove = new TimeSpan(0, 0, waitBeforeDisconnect);
             
@@ -65,19 +71,23 @@ namespace UDP_server
             {
                 try
                 {
+                    IPEndPoint clientIP = null;// new IPEndPoint(IPAddress.Any, listenPort);
+                    UdpReceiveResult result;
+                    byte[] bytes;
                     while (true)
                     {
-                        UdpReceiveResult result;
                         result = await listener.ReceiveAsync();
-                        byte[] bytes = result.Buffer;
-                        groupEP = result.RemoteEndPoint;
+                        bytes = result.Buffer;
+                        clientIP = result.RemoteEndPoint;
                         //answer for it fast as possible
                         if (bytes.SequenceEqual(ping))
                         {
-                            await listener.SendAsync(bytes, bytes.Length, groupEP);
+                            await listener.SendAsync(bytes, bytes.Length, clientIP);
                             lock (locker)
                             {
-                                Client currClient = AllClients.FirstOrDefault((c) => c.EndPoint.Address.ToString() == groupEP.Address.ToString());
+                                //Client currClient = AllClients.FirstOrDefault((c) => c.EndPoint.Address.Equals(groupEP.Address));
+                                //only for test !!! port instead adress
+                                Client currClient = AllClients.FirstOrDefault((c) => c.EndPoint.Port.Equals(clientIP.Port));
                                 if (currClient != null)
                                 {
                                     currClient.LastPing = DateTime.UtcNow;
@@ -89,27 +99,32 @@ namespace UDP_server
                         //already exist in collection 
                         lock (locker)
                         {
-                            if (groupEP != null && !AllClients.Any((client) => client.EndPoint.Address.ToString() == groupEP.Address.ToString()))
+                            //if (groupEP != null && !AllClients.Any((client) => client.EndPoint.Address.Equals(groupEP.Address)))
+                            //for test only!!!port instead adress
+                            if (clientIP != null && !AllClients.Any((client) => client.EndPoint.Port.Equals(clientIP.Port)))
                             {
                                 //log Count of clients? Like a critical load
-                                //make be some time...not every time
-                                Console.WriteLine($"added {groupEP}");
-                                logger.Info($"added {groupEP}");
-                                AllClients.Add(new Client(groupEP, DateTime.UtcNow));
-                                //when add new user's data, make it data as byte[]
+                                if (IsDebug)
+                                {
+                                    Console.WriteLine($"added {clientIP}");
+                                    logger.Info($"added {clientIP}");
+                                }
+                                AllClients.Add(new Client(clientIP, DateTime.UtcNow));
                             }
                             else
                             {
-
+                                //Client client = AllClients.FirstOrDefault(c => c.EndPoint.Adress.Equals(clientIP.Adress));
+                                //for test only!!!port instead adress
+                                Client client = AllClients.FirstOrDefault(c => c.EndPoint.Port.Equals(clientIP.Port));
+                                //client.Data = (ClientData)(bytes.Deserializer());
                             }
                         }
                         //not critical make null. ref modificator will change this reference
-                        groupEP = null;
+                        clientIP = null;
                     }
                 }
                 catch (SocketException e)
                 {
-                    Console.WriteLine(e?.Message);
                     logger.Fatal(e, $"UdpClient object is closing...{e.Message}");
                 }
                 finally
@@ -123,6 +138,7 @@ namespace UDP_server
                 try
                 {
                     DateTime temp;
+                    List<ClientData> myVisibleClientsTemp = null;
                     //timer only for logging
                     System.Timers.Timer intervalForWriteLog = new System.Timers.Timer() { Interval = IntervalForLogging, Enabled = true, AutoReset = false };
                     intervalForWriteLog.Elapsed += (object sender, System.Timers.ElapsedEventArgs e) => { ((System.Timers.Timer)sender).Enabled = false; };
@@ -130,14 +146,33 @@ namespace UDP_server
                     {
                         //await can't be in lock - is reason why the Collection without lock
                         //but i think it's non-critical in current situation, because here only send data for all clients(1.only read 2.not big problem if someone take data a few millisecond later)
+                        myVisibleClientsTemp = new List<ClientData>();
                         temp = DateTime.UtcNow;
                         lock (locker)
                         {
                             for (int z = 0; z < AllClients.Count; z++)
                             {
-                                //this answer will come to client not from 11000 port...(from who and to whom)
-                                //new List vs List.Clear()?
-                                listener.Send(null,0 , AllClients[z].EndPoint);
+                                //this answer will come to client not from 11000(this port is which server listen) port...(from who and to whom)
+                                //server will send answer from some server's output port to client's port(but not to 11001...?)
+                                //all my clients will in this current range
+                                float minX = AllClients[z].Data.X - 10;
+                                float maxX = AllClients[z].Data.X + 10;
+
+                                float maxY = AllClients[z].Data.Y - 10;
+                                float minY = AllClients[z].Data.Y + 10;
+
+                                float maxZ = AllClients[z].Data.Z - 10;
+                                float minZ = AllClients[z].Data.Z + 10;
+
+                                for (int n = 0; n < AllClients.Count; n++)
+                                {
+                                    if(AllClients[n].Data.X > minX && AllClients[n].Data.X < maxX)
+                                    {
+                                        myVisibleClientsTemp.Add(AllClients[n].Data);
+                                    }
+                                }
+                                byte[] bytes = myVisibleClientsTemp.Serializer();
+                                listener.Send(bytes, bytes.Length, AllClients[z].EndPoint);
                             }
                         }
                         TimeSpan total = DateTime.UtcNow.Subtract(temp);
@@ -191,7 +226,6 @@ namespace UDP_server
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
                     logger.Fatal(ex, $"mechanishm of remove disconnected clients has exception: {ex.Message}");
                 }
             });
