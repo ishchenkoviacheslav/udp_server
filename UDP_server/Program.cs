@@ -10,6 +10,7 @@ using System.Linq;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using NLog;
+using Shared;
 
 namespace UDP_server
 {
@@ -32,7 +33,7 @@ namespace UDP_server
         private static TimeSpan minimumPause = new TimeSpan(0,0,0,0,10);
         public static double IntervalForLogging = 0;
         private static bool IsDebug = false;
-
+        private static float RangeOfCoordinate = 0;
         private static void StartListener()
         {
             
@@ -45,7 +46,8 @@ namespace UDP_server
             refreshListOfClients = int.Parse(configuration[nameof(refreshListOfClients)]);
             IntervalForLogging = double.Parse(configuration[nameof(IntervalForLogging)]);
             IsDebug = bool.Parse(configuration[nameof(IsDebug)]);
-            if (/*Client_listenPort == 0 ||*/ server_listenPort == 0 || pauseBetweenSendData < 10 || waitBeforeDisconnect == 0 || refreshListOfClients == 0 || IntervalForLogging < 30000)
+            RangeOfCoordinate = float.Parse(configuration[nameof(RangeOfCoordinate)]);
+            if (/*Client_listenPort == 0 ||*/ server_listenPort == 0 || pauseBetweenSendData < 10 || waitBeforeDisconnect == 0 || refreshListOfClients == 0 || IntervalForLogging < 30000 || RangeOfCoordinate == 0)
             {
                 logger.Fatal("configuration data is wrong");
                 if (IsDebug)
@@ -116,7 +118,7 @@ namespace UDP_server
                                 //Client client = AllClients.FirstOrDefault(c => c.EndPoint.Adress.Equals(clientIP.Adress));
                                 //for test only!!!port instead adress
                                 Client client = AllClients.FirstOrDefault(c => c.EndPoint.Port.Equals(clientIP.Port));
-                                //client.Data = (ClientData)(bytes.Deserializer());
+                                client.Data = (ClientData)(bytes.Deserializer());
                             }
                         }
                         //not critical make null. ref modificator will change this reference
@@ -126,6 +128,10 @@ namespace UDP_server
                 catch (SocketException e)
                 {
                     logger.Fatal(e, $"UdpClient object is closing...{e.Message}");
+                }
+                catch(Exception ex)
+                {
+                    logger.Fatal(ex, $"UdpClient object is closing...{ex.Message}");
                 }
                 finally
                 {
@@ -150,28 +156,48 @@ namespace UDP_server
                         temp = DateTime.UtcNow;
                         lock (locker)
                         {
+                            //must make selection by range of coordinate...
+                            //may be will better realize some mechanism on client side for write to special collection for every zone of coordinate...
                             for (int z = 0; z < AllClients.Count; z++)
                             {
                                 //this answer will come to client not from 11000(this port is which server listen) port...(from who and to whom)
-                                //server will send answer from some server's output port to client's port(but not to 11001...?)
+                                //server will send answer from some server's output port to client's port(but not to 11001...?) - no, request came to server from 11001 and response also will send to 11001
                                 //all my clients will in this current range
-                                float minX = AllClients[z].Data.X - 10;
-                                float maxX = AllClients[z].Data.X + 10;
+                                float minX = AllClients[z].Data.X - RangeOfCoordinate;
+                                float maxX = AllClients[z].Data.X + RangeOfCoordinate;
 
-                                float maxY = AllClients[z].Data.Y - 10;
-                                float minY = AllClients[z].Data.Y + 10;
+                                float maxY = AllClients[z].Data.Y - RangeOfCoordinate;
+                                float minY = AllClients[z].Data.Y + RangeOfCoordinate;
 
-                                float maxZ = AllClients[z].Data.Z - 10;
-                                float minZ = AllClients[z].Data.Z + 10;
+                                float maxZ = AllClients[z].Data.Z - RangeOfCoordinate;
+                                float minZ = AllClients[z].Data.Z + RangeOfCoordinate;
 
                                 for (int n = 0; n < AllClients.Count; n++)
                                 {
+                                    //to do: extend condition (add Y and Z and may be check if it's not my id)
                                     if(AllClients[n].Data.X > minX && AllClients[n].Data.X < maxX)
                                     {
                                         myVisibleClientsTemp.Add(AllClients[n].Data);
                                     }
                                 }
-                                byte[] bytes = myVisibleClientsTemp.Serializer();
+                                byte[] bytes;
+                                //bytes = myVisibleClientsTemp.Serializer();
+                                bytes = new byte[((myVisibleClientsTemp.Count * 4) * 4)];
+                                byte[] tempByte;
+                                for (int c = 0; c < bytes.Length; c += 16)
+                                {
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 16].ID);
+                                    Buffer.BlockCopy(tempByte, 0, bytes, c, tempByte.Length);
+
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 16].X);
+                                    Buffer.BlockCopy(tempByte, 0, bytes, c + 4, tempByte.Length);
+
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 16].Y);
+                                    Buffer.BlockCopy(tempByte, 0, bytes, c + 8, tempByte.Length);
+
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 16].Z);
+                                    Buffer.BlockCopy(tempByte, 0, bytes, c + 12, tempByte.Length);
+                                }
                                 listener.Send(bytes, bytes.Length, AllClients[z].EndPoint);
                             }
                         }

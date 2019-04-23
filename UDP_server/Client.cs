@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Shared;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
@@ -16,6 +17,6 @@ namespace UDP_server
         public IPEndPoint EndPoint { get; set; }
         public DateTime LastPing { get; set; }
         public uint NumberOfPacket { get; set; }
-        public ClientData Data { get; set; } = new ClientData() { X = 0, Y = 0, Z = 0 };
+        public ClientData Data { get; set; } = new ClientData() {ID = 0, X = 0, Y = 0, Z = 0 };
     }
 }

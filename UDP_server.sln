@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.168
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UDP_server", "UDP_server\UDP_server.csproj", "{3F82F467-06AE-4D51-A907-BEE3DAC89175}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UDP_server", "UDP_server\UDP_server.csproj", "{3F82F467-06AE-4D51-A907-BEE3DAC89175}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{127E26E5-77B6-4FB4-AC14-5500A2E4EFCD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{3F82F467-06AE-4D51-A907-BEE3DAC89175}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3F82F467-06AE-4D51-A907-BEE3DAC89175}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3F82F467-06AE-4D51-A907-BEE3DAC89175}.Release|Any CPU.Build.0 = Release|Any CPU
+		{127E26E5-77B6-4FB4-AC14-5500A2E4EFCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{127E26E5-77B6-4FB4-AC14-5500A2E4EFCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{127E26E5-77B6-4FB4-AC14-5500A2E4EFCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{127E26E5-77B6-4FB4-AC14-5500A2E4EFCD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
