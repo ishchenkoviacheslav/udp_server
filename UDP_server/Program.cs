@@ -16,6 +16,7 @@ namespace UDP_server
 {
     //by productions: 
     //delete all cw(logger instead of this)
+    //change back equals by adress but not by port
     //
     public class UDPListener
     {
@@ -36,8 +37,6 @@ namespace UDP_server
         private static float RangeOfCoordinate = 0;
         private static void StartListener()
         {
-            
-
             //Client_listenPort = int.Parse(configuration["client_listenPort"]);
             server_listenPort = int.Parse(configuration[nameof(server_listenPort)]);
             //Server_listenPort = int.Parse(configuration.GetSection("server_listenPort").Value);
@@ -111,6 +110,7 @@ namespace UDP_server
                                     Console.WriteLine($"added {clientIP}");
                                     logger.Info($"added {clientIP}");
                                 }
+                                //to do: get from client coordinate(don't use standart ctor only!)
                                 AllClients.Add(new Client(clientIP, DateTime.UtcNow));
                             }
                             else
@@ -118,6 +118,7 @@ namespace UDP_server
                                 //Client client = AllClients.FirstOrDefault(c => c.EndPoint.Adress.Equals(clientIP.Adress));
                                 //for test only!!!port instead adress
                                 Client client = AllClients.FirstOrDefault(c => c.EndPoint.Port.Equals(clientIP.Port));
+                                //to do: use another algorithm? - also in client side
                                 client.Data = (ClientData)(bytes.Deserializer());
                             }
                         }
