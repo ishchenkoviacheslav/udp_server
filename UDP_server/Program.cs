@@ -17,7 +17,7 @@ namespace UDP_server
     //by productions: 
     //delete all cw(logger instead of this)
     //change back equals by adress but not by port
-    //
+    //change condition for add "my visible clients"
     public class UDPListener
     {
         private static IConfigurationRoot configuration;
@@ -176,7 +176,7 @@ namespace UDP_server
                                 for (int n = 0; n < AllClients.Count; n++)
                                 {
                                     //to do: extend condition (add Y and Z and may be check if it's not my id)
-                                    if(AllClients[n].Data.X > minX && AllClients[n].Data.X < maxX)
+                                    if(/*AllClients[n].Data.X > minX && AllClients[n].Data.X < maxX && */AllClients[n].Data.ID != AllClients[z].Data.ID)
                                     {
                                         myVisibleClientsTemp.Add(AllClients[n].Data);
                                     }
