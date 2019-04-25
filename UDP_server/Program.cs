@@ -51,15 +51,15 @@ namespace UDP_server
                 logger.Fatal("configuration data is wrong");
                 if (IsDebug)
                 {
-                    Console.WriteLine("configuration data is wrong");
+                    logger.Fatal("configuration data is wrong");
                 }
                 return;
             }
             if(IsDebug)
             {
                 Console.WriteLine("Waiting ...");
-                logger.Info("Waiting...");
                 Console.WriteLine("*********Server*******");
+                logger.Info("Waiting...");
             }
             UdpClient listener = new UdpClient(server_listenPort);
             //fix problem with disconnect or crash one of clients
@@ -107,7 +107,6 @@ namespace UDP_server
                                 //log Count of clients? Like a critical load
                                 if (IsDebug)
                                 {
-                                    Console.WriteLine($"added {clientIP}");
                                     logger.Info($"added {clientIP}");
                                 }
                                 //to do: get from client coordinate(don't use standart ctor only!)
@@ -254,7 +253,7 @@ namespace UDP_server
                             AllClients = AllClients.Except(listForRemove).ToList();
                         }
                         TimeSpan result = DateTime.UtcNow.Subtract(temp);
-                        Console.WriteLine(result);
+                        logger.Info($" Period of time for refresh(delete) disconnected clients: {result}");
                     }
                 }
                 catch (Exception ex)
