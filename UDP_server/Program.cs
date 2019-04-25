@@ -118,6 +118,10 @@ namespace UDP_server
                                 //Client client = AllClients.FirstOrDefault(c => c.EndPoint.Adress.Equals(clientIP.Adress));
                                 //for test only!!!port instead adress
                                 Client client = AllClients.FirstOrDefault(c => c.EndPoint.Port.Equals(clientIP.Port));
+                                if (client == null)
+                                {
+                                    logger.Error($"Client object is null! Didn't find coincidence clients by Address");
+                                }
                                 //to do: use another algorithm? - also in client side
                                 client.Data = (ClientData)(bytes.Deserializer());
                             }
@@ -200,6 +204,8 @@ namespace UDP_server
                                     Buffer.BlockCopy(tempByte, 0, bytes, c + 12, tempByte.Length);
                                 }
                                 listener.Send(bytes, bytes.Length, AllClients[z].EndPoint);
+                                //to do: Clear() vs new
+                                myVisibleClientsTemp = new List<ClientData>();
                             }
                         }
                         TimeSpan total = DateTime.UtcNow.Subtract(temp);
