@@ -74,6 +74,7 @@ namespace UDP_server
                 {
                     IPEndPoint clientIP = null;// new IPEndPoint(IPAddress.Any, listenPort);
                     UdpReceiveResult result;
+                    ClientData newClientDataPacket;
                     byte[] bytes;
                     while (true)
                     {
@@ -102,7 +103,7 @@ namespace UDP_server
                         {
                             //if (groupEP != null && !AllClients.Any((client) => client.EndPoint.Address.Equals(groupEP.Address)))
                             //for test only!!!port instead adress
-                            if (clientIP != null && !AllClients.Any((client) => client.EndPoint.Port.Equals(clientIP.Port)))
+                            if (!AllClients.Any((client) => client.EndPoint.Port.Equals(clientIP.Port)))
                             {
                                 //log Count of clients? Like a critical load
                                 if (IsDebug)
@@ -122,7 +123,23 @@ namespace UDP_server
                                     logger.Error($"Client object is null! Didn't find coincidence clients by Address");
                                 }
                                 //to do: use another algorithm? - also in client side
-                                client.Data = (ClientData)(bytes.Deserializer());
+                                newClientDataPacket = (ClientData)(bytes.Deserializer());
+                                //client must send packet like this: 1, 2, 3, 4... but if will bad connection or some another factor, packets can come here in another order, like this: 1, 2, 4, 3. If so just ignore(and leave old packet)
+                                //add only if new packet has more number than already available
+                                if(newClientDataPacket.NumberOfPacket > client.Data.NumberOfPacket )
+                                {
+                                    client.Data = newClientDataPacket;
+                                }
+                                else
+                                {
+                                    //if greater than float MAX Value
+                                    //new packet will has 1 
+                                    if(client.Data.NumberOfPacket == float.MaxValue)
+                                    {
+                                        logger.Info("greater than MAX and work!");
+                                        client.Data.NumberOfPacket = newClientDataPacket.NumberOfPacket;
+                                    }
+                                }
                             }
                         }
                         //not critical make null. ref modificator will change this reference
@@ -166,7 +183,7 @@ namespace UDP_server
                             {
                                 //this answer will come to client not from 11000(this port is which server listen) port...(from who and to whom)
                                 //server will send answer from some server's output port to client's port(but not to 11001...?) - no, request came to server from 11001 and response also will send to 11001
-                                //all my clients will in this current range
+                                //all my clients will in this current(in this iteration) range
                                 float minX = AllClients[z].Data.X - RangeOfCoordinate;
                                 float maxX = AllClients[z].Data.X + RangeOfCoordinate;
 
@@ -186,24 +203,32 @@ namespace UDP_server
                                 }
                                 byte[] bytes;
                                 //bytes = myVisibleClientsTemp.Serializer();
-                                bytes = new byte[((myVisibleClientsTemp.Count * 4) * 4)];
+                                //5 fiels(props) by 4 bytes every (float type)
+                                //common array for all my visible clients
+                                bytes = new byte[((myVisibleClientsTemp.Count * 5) * 4)];
                                 byte[] tempByte;
-                                for (int c = 0; c < bytes.Length; c += 16)
+                                //create small array for every of all my visible client and copy that to common array
+                                for (int c = 0; c < bytes.Length; c += 20)
                                 {
-                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 16].ID);
+                                    //myVisibleClientsTemp[c / 20] - roundint to int type
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 20].ID);
                                     Buffer.BlockCopy(tempByte, 0, bytes, c, tempByte.Length);
 
-                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 16].X);
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 20].X);
                                     Buffer.BlockCopy(tempByte, 0, bytes, c + 4, tempByte.Length);
 
-                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 16].Y);
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 20].Y);
                                     Buffer.BlockCopy(tempByte, 0, bytes, c + 8, tempByte.Length);
 
-                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 16].Z);
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 20].Z);
                                     Buffer.BlockCopy(tempByte, 0, bytes, c + 12, tempByte.Length);
+
+                                    tempByte = BitConverter.GetBytes(myVisibleClientsTemp[c / 20].NumberOfPacket);
+                                    Buffer.BlockCopy(tempByte, 0, bytes, c + 16, tempByte.Length);
                                 }
+                                //send common array to my.
                                 listener.Send(bytes, bytes.Length, AllClients[z].EndPoint);
-                                //to do: Clear() vs new
+                                //to do: Clear()(longer but GC will not has more work) vs new(faster but GC will has more work)
                                 myVisibleClientsTemp = new List<ClientData>();
                             }
                         }
