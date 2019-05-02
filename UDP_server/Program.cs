@@ -134,7 +134,7 @@ namespace UDP_server
                                 {
                                     //if greater than float MAX Value
                                     //new packet will has 1 
-                                    if(client.Data.NumberOfPacket == float.MaxValue)
+                                    if(client.Data.NumberOfPacket == int.MaxValue)
                                     {
                                         logger.Info("greater than MAX and work!");
                                         client.Data.NumberOfPacket = newClientDataPacket.NumberOfPacket;
